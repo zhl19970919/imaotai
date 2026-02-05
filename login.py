@@ -14,14 +14,14 @@ class Login:
             'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
             'Accept-Encoding': 'gzip, deflate, br',
             'Connection': 'keep-alive',
-            'Referer': 'https://h5.moutai519.com.cn/',
-            'Origin': 'https://h5.moutai519.com.cn'
+            'Referer': 'https://www.moutaichina.com/',
+            'Origin': 'https://www.moutaichina.com'
         })
 
     def start_session(self):
-        print("正在访问i茅台H5页面...")
+        print("正在访问i茅台官网...")
         try:
-            response = self.session.get('https://h5.moutai519.com.cn/')
+            response = self.session.get('https://www.moutaichina.com/')
             print(f"访问成功，状态码: {response.status_code}")
             return True
         except Exception as e:
@@ -35,9 +35,9 @@ class Login:
         if not phone:
             raise ValueError("请先在config.json中配置手机号")
 
-        print("正在访问i茅台H5页面...")
+        print("正在访问i茅台官网...")
         try:
-            response = self.session.get('https://h5.moutai519.com.cn/')
+            response = self.session.get('https://www.moutaichina.com/')
             print(f"访问成功，状态码: {response.status_code}")
         except Exception as e:
             print(f"访问失败: {e}")
@@ -48,7 +48,7 @@ class Login:
         print("尝试获取登录接口信息...")
         
         try:
-            login_api_url = "https://h5.moutai519.com.cn/gw/api/user/login/sendSmsCode"
+            login_api_url = "https://www.moutaichina.com/gw/api/user/login/sendSmsCode"
             login_data = {
                 "phone": phone
             }
@@ -66,7 +66,7 @@ class Login:
                 
                 if password:
                     print("使用验证码登录...")
-                    verify_api_url = "https://h5.moutai519.com.cn/gw/api/user/login/verifySmsCode"
+                    verify_api_url = "https://www.moutaichina.com/gw/api/user/login/verifySmsCode"
                     verify_data = {
                         "phone": phone,
                         "code": password
