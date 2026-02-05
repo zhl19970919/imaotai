@@ -83,16 +83,47 @@ python -m pip install --upgrade pip
 ```
 
 ### 2. 安装Playwright
+
+#### 方法一：使用国内镜像源（推荐）
+```bash
+pip install -i https://pypi.tuna.tsinghua.edu.cn/simple playwright
+```
+
+#### 方法二：使用官方源
+```bash
+pip install playwright
+```
+
+如果安装失败，请尝试以下步骤：
+
+1. 升级pip到最新版本
+```bash
+python -m pip install --upgrade pip
+```
+
+2. 清理pip缓存
+```bash
+pip cache purge
+```
+
+3. 重新安装
 ```bash
 pip install playwright
 ```
 
 ### 3. 安装Chromium浏览器
+
+**注意**：在Termux中，Playwright的Chromium可能无法正常工作。建议使用以下替代方案：
+
+#### 方案一：使用系统浏览器（推荐）
+Termux可以直接使用Android系统的浏览器，无需安装Chromium。
+
+#### 方案二：安装Playwright浏览器（可能失败）
 ```bash
 playwright install chromium
 ```
 
-注意：这一步可能需要较长时间，请确保网络连接稳定。
+如果安装失败，可以跳过此步骤，程序会自动使用系统浏览器。
 
 ## 五、配置程序
 
@@ -202,39 +233,73 @@ A: 使用国内镜像源：
 pip install -i https://pypi.tuna.tsinghua.edu.cn/simple playwright
 ```
 
-### Q3: Playwright安装Chromium失败
+### Q3: pip install playwright失败，提示"No matching distribution found"
+A: 这通常是网络问题，尝试以下解决方案：
+
+#### 解决方案1：使用清华镜像源
+```bash
+pip install -i https://pypi.tuna.tsinghua.edu.cn/simple playwright
+```
+
+#### 解决方案2：使用阿里云镜像源
+```bash
+pip install -i https://mirrors.aliyun.com/pypi/simple/ playwright
+```
+
+#### 解决方案3：升级pip后重试
+```bash
+python -m pip install --upgrade pip
+pip install playwright
+```
+
+#### 解决方案4：清理缓存后重试
+```bash
+pip cache purge
+pip install playwright
+```
+
+### Q4: Playwright安装Chromium失败
 A: 确保网络连接稳定，或使用代理：
 ```bash
 export PLAYWRIGHT_DOWNLOAD_HOST=https://playwright.azureedge.net
 playwright install chromium
 ```
 
-### Q4: 浏览器无法启动
-A: Termux可能需要额外依赖：
-```bash
-pkg install libllvm
-```
+**注意**：在Termux中，Chromium可能无法正常安装或运行。建议跳过此步骤，程序会自动使用系统浏览器。
 
-### Q5: 程序运行时闪退
+### Q5: 浏览器启动失败
+A: 在Termux中，Playwright的Chromium可能不兼容。建议：
+
+1. 跳过`playwright install chromium`步骤
+2. 程序会自动使用Android系统浏览器
+3. 确保已授予Termux网络权限
+
+### Q6: 程序运行时闪退
 A: 查看错误日志：
 ```bash
 python main.py 2>&1 | tee error.log
 ```
 
-### Q6: 键盘输入不方便
+常见原因：
+- Python版本过低（需要3.8+）
+- Playwright未正确安装
+- 配置文件格式错误
+- 网络连接问题
+
+### Q7: 键盘输入不方便
 A: 安装Termux:API和额外键盘：
 ```bash
 pkg install termux-api
 ```
 然后在设置中启用Termux键盘。
 
-### Q7: 存储空间不足
+### Q8: 存储空间不足
 A: 清理不必要的文件：
 ```bash
 pkg clean
 ```
 
-### Q8: 如何保持Termux后台运行
+### Q9: 如何保持Termux后台运行
 A: 使用Termux:Boot或nohup命令：
 ```bash
 nohup python main.py > run.log 2>&1 &
