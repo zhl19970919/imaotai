@@ -1,28 +1,32 @@
-from playwright.sync_api import sync_playwright
+import requests
 from config import Config
 import time
+import json
 
 
 class Login:
     def __init__(self, config: Config):
         self.config = config
-        self.browser = None
-        self.context = None
-        self.page = None
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1',
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Referer': 'https://h5.moutai519.com.cn/',
+            'Origin': 'https://h5.moutai519.com.cn'
+        })
 
-    def start_browser(self):
-        playwright = sync_playwright().start()
-        settings = self.config.get_settings()
-        
-        self.browser = playwright.chromium.launch(
-            headless=settings.get('headless', False)
-        )
-        self.context = self.browser.new_context(
-            viewport={'width': 375, 'height': 812},
-            user_agent='Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1'
-        )
-        self.page = self.context.new_page()
-        return self.page
+    def start_session(self):
+        print("正在访问i茅台H5页面...")
+        try:
+            response = self.session.get('https://h5.moutai519.com.cn/')
+            print(f"访问成功，状态码: {response.status_code}")
+            return True
+        except Exception as e:
+            print(f"访问失败: {e}")
+            return False
 
     def login(self):
         phone = self.config.get_phone()
@@ -32,65 +36,69 @@ class Login:
             raise ValueError("请先在config.json中配置手机号")
 
         print("正在访问i茅台H5页面...")
-        self.page.goto('https://h5.moutai519.com.cn/')
+        try:
+            response = self.session.get('https://h5.moutai519.com.cn/')
+            print(f"访问成功，状态码: {response.status_code}")
+        except Exception as e:
+            print(f"访问失败: {e}")
+            return False
         
-        time.sleep(3)
+        time.sleep(2)
         
-        print("查找登录按钮...")
-        login_button = self.page.locator('text=登录').first
-        if not login_button.is_visible():
-            login_button = self.page.locator('text=我的').first
+        print("尝试获取登录接口信息...")
         
-        if login_button.is_visible():
-            print("点击登录按钮")
-            login_button.click()
-            time.sleep(2)
-        
-        print("查找手机号输入框...")
-        phone_input = self.page.locator('input[type="tel"]').first
-        if not phone_input.is_visible():
-            phone_input = self.page.locator('input[placeholder*="手机"]').first
-        
-        if phone_input.is_visible():
-            print("输入手机号")
-            phone_input.fill(phone)
-            time.sleep(1)
+        try:
+            login_api_url = "https://h5.moutai519.com.cn/gw/api/user/login/sendSmsCode"
+            login_data = {
+                "phone": phone
+            }
             
-            print("查找验证码按钮...")
-            code_button = self.page.locator('button:has-text("获取验证码")').first
-            if not code_button.is_visible():
-                code_button = self.page.locator('text=获取验证码').first
+            print(f"发送验证码到: {phone}")
+            response = self.session.post(login_api_url, json=login_data)
+            print(f"验证码发送响应: {response.status_code}")
             
-            if code_button.is_visible():
-                print("点击获取验证码")
-                code_button.click()
-                time.sleep(2)
+            if response.status_code == 200:
+                result = response.json()
+                print(f"响应内容: {result}")
                 
                 print(f"请输入收到的验证码（当前密码字段: {password}）")
                 print("提示：如果需要手动输入验证码，请在config.json中更新password字段")
                 
-                code_input = self.page.locator('input[placeholder*="验证码"]').first
-                if code_input.is_visible():
-                    code_input.fill(password)
-                    time.sleep(1)
+                if password:
+                    print("使用验证码登录...")
+                    verify_api_url = "https://h5.moutai519.com.cn/gw/api/user/login/verifySmsCode"
+                    verify_data = {
+                        "phone": phone,
+                        "code": password
+                    }
                     
-                    submit_button = self.page.locator('button:has-text("登录")').first
-                    if not submit_button.is_visible():
-                        submit_button = self.page.locator('button:has-text("确认")').first
+                    response = self.session.post(verify_api_url, json=verify_data)
+                    print(f"登录响应: {response.status_code}")
                     
-                    if submit_button.is_visible():
-                        print("点击登录")
-                        submit_button.click()
-                        time.sleep(3)
+                    if response.status_code == 200:
+                        result = response.json()
+                        print(f"登录结果: {result}")
                         
-                        print("登录流程完成")
-                        return True
-        
-        print("登录流程完成（可能已登录或需要手动操作）")
-        return True
+                        if result.get('code') == 2000:
+                            print("登录成功！")
+                            return True
+                        else:
+                            print(f"登录失败: {result.get('msg', '未知错误')}")
+                            return False
+                    else:
+                        print(f"登录请求失败: {response.status_code}")
+                        return False
+                else:
+                    print("未提供验证码，请在config.json中配置password字段")
+                    return False
+            else:
+                print(f"验证码发送失败: {response.status_code}")
+                return False
+                
+        except Exception as e:
+            print(f"登录过程出错: {e}")
+            return False
 
     def close(self):
-        if self.context:
-            self.context.close()
-        if self.browser:
-            self.browser.close()
+        self.session.close()
+        print("会话已关闭")

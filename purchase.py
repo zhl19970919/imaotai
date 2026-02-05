@@ -1,13 +1,15 @@
-from playwright.sync_api import sync_playwright
+import requests
 from config import Config
 import time
 from datetime import datetime
+import re
+from bs4 import BeautifulSoup
 
 
 class Purchase:
-    def __init__(self, config: Config, page):
+    def __init__(self, config: Config, session):
         self.config = config
-        self.page = page
+        self.session = session
         self.settings = config.get_settings()
 
     def wait_for_purchase_time(self, purchase_time):
@@ -46,85 +48,112 @@ class Purchase:
         print(f"购买数量: {quantity} 瓶")
         print(f"访问商品页面: {product_url}")
         
-        self.page.goto(product_url)
-        time.sleep(2)
-        
-        print("查找购买按钮...")
-        purchase_button = self.page.locator('button:has-text("立即申购")').first
-        if not purchase_button.is_visible():
-            purchase_button = self.page.locator('button:has-text("立即购买")').first
-        if not purchase_button.is_visible():
-            purchase_button = self.page.locator('button:has-text("申购")').first
-        if not purchase_button.is_visible():
-            purchase_button = self.page.locator('text=立即申购').first
-        if not purchase_button.is_visible():
-            purchase_button = self.page.locator('text=申购').first
-        
-        if purchase_button.is_visible():
-            print("点击购买按钮")
-            purchase_button.click()
-            time.sleep(1)
+        try:
+            response = self.session.get(product_url)
+            print(f"访问商品页面成功，状态码: {response.status_code}")
             
-            print("设置购买数量...")
-            self._set_quantity(quantity)
-            time.sleep(1)
+            soup = BeautifulSoup(response.text, 'html.parser')
             
-            print("查找确认按钮...")
-            confirm_button = self.page.locator('button:has-text("确认")').first
-            if not confirm_button.is_visible():
-                confirm_button = self.page.locator('button:has-text("提交")').first
-            if not confirm_button.is_visible():
-                confirm_button = self.page.locator('button:has-text("确定")').first
+            print("查找商品ID...")
+            product_id = self._extract_product_id(soup, product_url)
             
-            if confirm_button.is_visible():
-                print("点击确认订单")
-                confirm_button.click()
-                time.sleep(2)
+            if product_id:
+                print(f"商品ID: {product_id}")
+                return self._submit_order(product_id, quantity, product_name)
+            else:
+                print("未找到商品ID，尝试直接提交订单")
+                return self._submit_order_direct(product_url, quantity, product_name)
                 
-                print("检查抢购结果...")
-                success_text = self.page.locator('text=申购成功').first
-                if not success_text.is_visible():
-                    success_text = self.page.locator('text=申购成功').first
-                if not success_text.is_visible():
-                    success_text = self.page.locator('text=提交成功').first
-                
-                if success_text.is_visible():
-                    print(f"✓ 商品 {product_name} 抢购成功！购买数量: {quantity} 瓶")
-                    return True
-            
-            print(f"✗ 商品 {product_name} 抢购失败")
-            return False
-        else:
-            print(f"未找到购买按钮，商品可能已售罄或未到抢购时间")
-            print("提示：请检查商品URL是否正确")
+        except Exception as e:
+            print(f"抢购过程出错: {e}")
             return False
 
-    def _set_quantity(self, quantity):
-        quantity_input = self.page.locator('input[type="number"]').first
-        if not quantity_input.is_visible():
-            quantity_input = self.page.locator('input[placeholder*="数量"]').first
-        if not quantity_input.is_visible():
-            quantity_input = self.page.locator('input[placeholder*="购买数量"]').first
+    def _extract_product_id(self, soup, url):
+        try:
+            product_id = None
+            
+            method1 = soup.find('input', {'name': 'productId'})
+            if method1:
+                product_id = method1.get('value')
+            
+            if not product_id:
+                method2 = soup.find('div', {'class': re.compile(r'product.*id', re.I)})
+                if method2:
+                    product_id = method2.get('data-product-id')
+            
+            if not product_id:
+                match = re.search(r'/product/(\d+)', url)
+                if match:
+                    product_id = match.group(1)
+            
+            return product_id
+        except Exception as e:
+            print(f"提取商品ID失败: {e}")
+            return None
+
+    def _submit_order(self, product_id, quantity, product_name):
+        print(f"提交订单: 商品ID={product_id}, 数量={quantity}")
         
-        if quantity_input.is_visible():
-            print(f"设置数量为: {quantity}")
-            quantity_input.fill(str(quantity))
-            return True
+        try:
+            order_api_url = "https://h5.moutai519.com.cn/gw/api/order/add"
+            order_data = {
+                "productId": product_id,
+                "quantity": quantity,
+                "deliveryType": 1
+            }
+            
+            response = self.session.post(order_api_url, json=order_data)
+            print(f"订单提交响应: {response.status_code}")
+            
+            if response.status_code == 200:
+                result = response.json()
+                print(f"订单结果: {result}")
+                
+                if result.get('code') == 2000:
+                    print(f"✓ 商品 {product_name} 抢购成功！购买数量: {quantity} 瓶")
+                    return True
+                else:
+                    print(f"✗ 商品 {product_name} 抢购失败: {result.get('msg', '未知错误')}")
+                    return False
+            else:
+                print(f"订单提交失败: {response.status_code}")
+                return False
+                
+        except Exception as e:
+            print(f"提交订单出错: {e}")
+            return False
+
+    def _submit_order_direct(self, product_url, quantity, product_name):
+        print(f"尝试直接提交订单: {product_url}")
         
-        plus_button = self.page.locator('button:has-text("+")').first
-        minus_button = self.page.locator('button:has-text("-")').first
-        
-        if plus_button.is_visible() and minus_button.is_visible():
-            print(f"使用加减按钮设置数量: {quantity}")
-            current_quantity = 1
-            while current_quantity < quantity:
-                plus_button.click()
-                current_quantity += 1
-                time.sleep(0.1)
-            return True
-        
-        print("未找到数量选择器，使用默认数量")
-        return False
+        try:
+            order_api_url = "https://h5.moutai519.com.cn/gw/api/order/add"
+            order_data = {
+                "productUrl": product_url,
+                "quantity": quantity,
+                "deliveryType": 1
+            }
+            
+            response = self.session.post(order_api_url, json=order_data)
+            print(f"订单提交响应: {response.status_code}")
+            
+            if response.status_code == 200:
+                result = response.json()
+                print(f"订单结果: {result}")
+                
+                if result.get('code') == 2000:
+                    print(f"✓ 商品 {product_name} 抢购成功！购买数量: {quantity} 瓶")
+                    return True
+                else:
+                    print(f"✗ 商品 {product_name} 抢购失败: {result.get('msg', '未知错误')}")
+                    return False
+            else:
+                print(f"订单提交失败: {response.status_code}")
+                return False
+                
+        except Exception as e:
+            print(f"提交订单出错: {e}")
+            return False
 
     def run_purchase(self):
         products = self.config.get_products()

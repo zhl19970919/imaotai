@@ -8,12 +8,12 @@ def main():
         config = Config('config.json')
         
         login = Login(config)
-        page = login.start_browser()
+        session = login.start_session()
         
         if login.login():
             print("登录成功，开始监控商品...")
             
-            purchase = Purchase(config, page)
+            purchase = Purchase(config, login.session)
             purchase.run_purchase()
         
         login.close()
